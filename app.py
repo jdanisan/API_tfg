@@ -3,7 +3,6 @@ import requests
 from bs4 import BeautifulSoup
 import unicodedata
 from urllib.parse import urljoin
-
 app = Flask(__name__)
 
 BASE_DOMAIN = "https://observatorioprecios.es"
