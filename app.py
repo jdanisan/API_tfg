@@ -42,7 +42,8 @@ def obtener_datos_agricolas():
 
     # Scrape each product page
     for url_producto in enlaces_productos:
-        producto_nombre = url_producto.strip("/").split("/")[-1]
+        producto_nombre = next((prod for prod in seleccion_normalizada if prod in texto), None)
+        
 
         r = requests.get(url_producto)
         soup_producto = BeautifulSoup(r.text, "html.parser")
