@@ -42,7 +42,7 @@ def obtener_datos_agricolas():
 
     # Scrape each product page
     for url_producto in enlaces_productos:
-        producto_nombre = next((prod for prod in seleccion_normalizada if prod in texto), None)
+        producto_nombre = next((prod for prod in seleccion_normalizada if prod in url_producto), None)
         
 
         r = requests.get(url_producto)
