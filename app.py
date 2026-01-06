@@ -1,8 +1,17 @@
+import firebase_admin
+from firebase_admin import credentials, db
 from flask import Flask, jsonify
 import requests
 from bs4 import BeautifulSoup
 import unicodedata
 from urllib.parse import urljoin
+
+# Inicializar Firebase Admin
+cred = credentials.Certificate('ruta/a/tu/archivo/firebase-adminsdk.json')
+firebase_admin.initialize_app(cred, {
+    'databaseURL': 'https://<tu-database>.firebaseio.com/'  # Cambia por tu URL de Firebase Realtime Database
+})
+
 app = Flask(__name__)
 
 BASE_DOMAIN = "https://observatorioprecios.es"
@@ -26,12 +35,12 @@ def obtener_datos_agricolas():
     ]
     seleccion_normalizada = [normalizar(p) for p in seleccion]
 
-    # Get main page
+    # Obtener la página principal
     response = requests.get(URL_BASE)
     response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
 
-    # Find all product links matching selection
+    # Encontrar enlaces a productos relevantes
     enlaces_productos = set()
     for a in soup.find_all("a", href=True):
         texto = normalizar(a.get_text())
@@ -40,7 +49,7 @@ def obtener_datos_agricolas():
 
     resultado = []
 
-    # Scrape each product page
+    # Scrapear datos de cada producto
     for url_producto in enlaces_productos:
         producto_nombre = next((prod for prod in seleccion_normalizada if prod in url_producto), None)
         
@@ -52,17 +61,17 @@ def obtener_datos_agricolas():
         if not t:
             continue
 
-        # Handle non-standard table (flat <td> structure)
+        # Manejar tablas no estándar (estructura plana de <td>)
         celdas = t.find_all("td")
         if not celdas:
             continue
 
-        # Detect number of columns dynamically from <thead>
+        # Detectar el numero de columnas dinámicamente desde <thead>
         thead = t.find("thead")
         if thead:
             num_cols = len(thead.find_all("th"))
         else:
-            num_cols = 3  # fallback
+            num_cols = 3  # por defecto si no hay thead
 
         semanas = []
         precios = []
@@ -86,13 +95,22 @@ def obtener_datos_agricolas():
             semanas.append(fecha)
             precios.extend([precio_p, precio_m])
 
+        # Subir los datos a Firebase Realtime Database
+        for semana, precio_p, precio_m in zip(semanas, precios[::2], precios[1::2]):
+            producto_ref = db.reference(f'productos/{producto_nombre}')  # La ruta en Firebase
+            producto_ref.push({
+                'semana': semana,
+                'precio_p': precio_p,
+                'precio_m': precio_m
+            })
+
         resultado.append({
             "Producto": producto_nombre,
             "Precios": precios,
             "Semanas": semanas
         })
 
-    return jsonify(resultado)
+    return jsonify({"status": "Datos guardados exitosamente en Firebase Realtime Database"})
 
 if __name__ == "__main__":
     app.run()
