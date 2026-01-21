@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 app = Flask(__name__)
 
 BASE_DOMAIN = "https://observatorioprecios.es"
-URL_BASE = "https://web.archive.org/web/20250803151436/https://observatorioprecios.es/alimentos-frescos/"
+URL_BASE = "https://observatorioprecios.es/alimentos-frescos/patata"
 
 def normalizar(texto):
     if texto is None:
