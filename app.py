@@ -19,46 +19,38 @@ def normalizar(texto):
 @app.route("/obtener-datos")
 def obtener_datos_agricolas():
     seleccion = [
-        "patata", "acelga", "calabacin", "cebolla", "judia",
-        "lechuga", "pimiento", "tomate",
-        "zanahoria", "limon", "manzana", "clementina",
-        "naranja", "pera", "platano",
+        "patata", "acelga", "calabacin", "cebolla", "judia-verde-plana",
+        "lechuga-romana", "pimiento-verde", "tomate-redondo-liso",
+        "zanahoria", "limon", "manzana-golden", "clementina",
+        "naranja-tipo-navel", "pera-de-agua-o-blanquilla", "platano",
     ]
+    
     seleccion_normalizada = [normalizar(p) for p in seleccion]
-
-    # Get main page
-    response = requests.get(URL_BASE)
-    response.raise_for_status()
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    # Find all product links matching selection
-    enlaces_productos = set()
-    for a in soup.find_all("a", href=True):
-        texto = normalizar(a.get_text())
-        if texto and any(prod in texto for prod in seleccion_normalizada):
-            enlaces_productos.add(urljoin(BASE_DOMAIN, a["href"]))
 
     resultado = []
 
-    # Scrape each product page
-    for url_producto in enlaces_productos:
-        producto_nombre = next((prod for prod in seleccion_normalizada if prod in url_producto), None)
-        
+    # Construir URLs directamente
+    for producto in seleccion_normalizada:
+        url_producto = urljoin(URL_BASE, producto + "/")
 
-        r = requests.get(url_producto)
-        soup_producto = BeautifulSoup(r.text, "html.parser")
-
-        t = soup_producto.find("table", class_="anio-precios")
-        if not t:
+        try:
+            r = requests.get(url_producto, timeout=10)
+            if r.status_code != 200:
+                continue
+        except requests.RequestException:
             continue
 
-        # Handle non-standard table (flat <td> structure)
-        celdas = t.find_all("td")
+        soup_producto = BeautifulSoup(r.text, "html.parser")
+
+        tabla = soup_producto.find("table", class_="anio-precios")
+        if not tabla:
+            continue
+
+        celdas = tabla.find_all("td")
         if not celdas:
             continue
 
-        # Detect number of columns dynamically from <thead>
-        thead = t.find("thead")
+        thead = tabla.find("thead")
         if thead:
             num_cols = len(thead.find_all("th"))
         else:
@@ -68,31 +60,41 @@ def obtener_datos_agricolas():
         precios = []
 
         for i in range(0, len(celdas), num_cols):
-            fila = celdas[i:i+num_cols]
+            fila = celdas[i:i + num_cols]
             if len(fila) < 2:
                 continue
 
             fecha = fila[0].get_text(strip=True)
+
             try:
-                precio_p = float(fila[1].get_text(strip=True).replace("€","").replace(",","."))
-            except:
+                precio_p = float(
+                    fila[1].get_text(strip=True)
+                    .replace("€", "")
+                    .replace(",", ".")
+                )
+            except ValueError:
                 precio_p = 0.0
 
             try:
-                precio_m = float(fila[2].get_text(strip=True).replace("€","").replace(",","."))
-            except:
+                precio_m = float(
+                    fila[2].get_text(strip=True)
+                    .replace("€", "")
+                    .replace(",", ".")
+                )
+            except (ValueError, IndexError):
                 precio_m = 0.0
 
             semanas.append(fecha)
             precios.extend([precio_p, precio_m])
 
         resultado.append({
-            "Producto": producto_nombre,
-            "Precios": precios,
-            "Semanas": semanas
+            "Producto": producto,
+            "URL": url_producto,
+            "Semanas": semanas,
+            "Precios": precios
         })
 
     return jsonify(resultado)
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
